@@ -49,8 +49,8 @@ def test_url_for():
 
 
 # 定义虚拟数据填充页面内容
-name = 'Grey Li'
-movies = [
+name = 'Emroy Can'
+books = [
     {'title': 'My Neighbor Totoro', 'year': '1988'},
     {'title': 'Dead Poets Society', 'year': '1989'},
     {'title': 'A Perfect World', 'year': '1993'},
@@ -71,7 +71,7 @@ movies = [
 
 @app.route('/')
 def index():
-    return render_template('index.html', name=name, movies=movies)
+    return render_template('index.html', name=name, books=books)
     # 左边的 movies 是模板中使用的变量名称，右边的 movies 则是该变量指向的实际对象。
     # 这里传入模板的 name 是字符串，movies 是列表，
     # 模板里使用的Python 数据结构也可以传入元组、字典、函数等。

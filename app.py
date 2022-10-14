@@ -1,4 +1,5 @@
 # 程序主页
+from flask import Flask, render_template
 from markupsafe import escape
 from flask import Flask
 from flask import url_for
@@ -45,3 +46,33 @@ def test_url_for():
     # 下面这个调用传入了多余的关键字参数，它们会被作为查询字符串附加到 URL 后面。
     print(url_for('test_url_for', num=2))  # 输出：/test?num=2
     return 'Test page'
+
+
+# 定义虚拟数据填充页面内容
+name = 'Grey Li'
+movies = [
+    {'title': 'My Neighbor Totoro', 'year': '1988'},
+    {'title': 'Dead Poets Society', 'year': '1989'},
+    {'title': 'A Perfect World', 'year': '1993'},
+    {'title': 'Leon', 'year': '1994'},
+    {'title': 'Mahjong', 'year': '1996'},
+    {'title': 'Swallowtail Butterfly', 'year': '1996'},
+    {'title': 'King of Comedy', 'year': '1999'},
+    {'title': 'Devils on the Doorstep', 'year': '1999'},
+    {'title': 'WALL-E', 'year': '2008'},
+    {'title': 'The Pork of Music', 'year': '2012'},
+]
+
+# 渲染主页模板
+# 返回渲染好的模板作为响应
+
+# ...
+
+
+@app.route('/')
+def index():
+    return render_template('index.html', name=name, movies=movies)
+    # 左边的 movies 是模板中使用的变量名称，右边的 movies 则是该变量指向的实际对象。
+    # 这里传入模板的 name 是字符串，movies 是列表，
+    # 模板里使用的Python 数据结构也可以传入元组、字典、函数等。
+    # render_template() 函数在调用时会识别并执行 index.html 里所有的 Jinja2 语句

@@ -76,17 +76,17 @@ books = [
 # ...
 
 
-@app.route('/')
-def index():
-    # 设置了数据库，负责显示主页的 index 可以从数据库里读取真实的数据：
-    user = User.query.first()  # 读取用户记录
-    books = Book.query.all()  # 读取所有电影记录
-    return render_template('index.html', user=user, books=books)
-    # return render_template('index.html', name=name, books=books)
-    # 左边的 movies 是模板中使用的变量名称，右边的 movies 则是该变量指向的实际对象。
-    # 这里传入模板的 name 是字符串，movies 是列表，
-    # 模板里使用的Python 数据结构也可以传入元组、字典、函数等。
-    # render_template() 函数在调用时会识别并执行 index.html 里所有的 Jinja2 语句
+# @app.route('/')
+# def index():
+#     # 设置了数据库，负责显示主页的 index 可以从数据库里读取真实的数据：
+#     user = User.query.first()  # 读取用户记录
+#     books = Book.query.all()  # 读取所有电影记录
+#     return render_template('index.html', user=user, books=books)
+#     # return render_template('index.html', name=name, books=books)
+#     # 左边的 movies 是模板中使用的变量名称，右边的 movies 则是该变量指向的实际对象。
+#     # 这里传入模板的 name 是字符串，movies 是列表，
+#     # 模板里使用的Python 数据结构也可以传入元组、字典、函数等。
+#     # render_template() 函数在调用时会识别并执行 index.html 里所有的 Jinja2 语句
 
 
 # db = SQLAlchemy(app)  # 初始化扩展，传入程序实例app
@@ -185,8 +185,6 @@ def initdb(drop):
 
 
 # 生成虚拟数据 编写命令函数把虚拟数据添加到数据库
-
-
 @app.cli.command()
 def forge():
     """Generate fake data."""
@@ -215,3 +213,28 @@ def forge():
 
     db.session.commit()
     click.echo('Done.')
+
+
+@app.errorhandler(404)  # 传入要处理的错误代码
+def page_not_found(e):  # 接受异常对象作为参数
+    user = User.query.first()
+    return render_template('404.html', user=user), 404  # 返回模板和状态码
+
+# 模板上下文处理函数
+
+
+@app.context_processor
+def inject_user():  # 函数名可以随意修改
+    user = User.query.first()
+    return dict(user=user)  # 需要返回字典，等同于 return {'user': user}
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+
+@app.route('/')
+def index():
+    books = Book.query.all()
+    return render_template('index.html', books=books)

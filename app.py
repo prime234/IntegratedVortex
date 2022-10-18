@@ -4,9 +4,11 @@ from flask import Flask, render_template
 from markupsafe import escape
 from flask import Flask
 from flask import url_for
-
+from flask import request, url_for, redirect, flash
+# Flask 会在请求触发后把请求信息放到 request 对象里，你可以从 flask 包导入它：
 import os
 import sys
+# from foo_orm import Model, Column, String
 
 from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
 
@@ -107,13 +109,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = prefix + \
         app.root_path, 'data.db')  # 设置数据库URL  SQLALCHEMY_DATABASE_URI 变量来告诉 SQLAlchemy 数据库连接地址
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
 # 在扩展类实例化前加载配置
+app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
 db = SQLAlchemy(app)  # 初始化扩展，传入程序实例app
 
 
-# 创建数据库模型
-class User(db.Model):  # 表名user(自动生成)
+# 创建数据库模型 SQL炼金术
+class User(db.Model):  # 表名user(自动生成) 单个单词转小写 多个小写下划线分割
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))   # 名字
+# 表的字段（列）由db.Column类的实例表示，字段的类型通过Column类的构造方法的第一个参数传入
 
 
 class Book(db.Model):  # 表名book
@@ -144,9 +148,17 @@ def initdb(drop):
     db.create_all()
     click.echo('Initialized database.')  # 输出提示信息
 
+# 数据库操作 CRUD
+# SQLAIchemy使用数据库会话来管理数据库操作，这里的数据库会话也称事务（transaction)
+# Flask-SQLAIchemy会自动帮我们创建会话，可以通过db.session属性获取。
+# 会话代表一个临时存储区，只有调用commit()方法改动才会被提交到数据库，这确保了数据提交的一致性。支持回滚操作，rollback(),撤销改动未提交。
+
 
 # flask shell向数据库中添加记录
-# >>> from app import User, Movie  # 导入模型类
+# 1. 创建python对象(实例化模型类)作为一条记录
+# 2. 添加新创建的记录到数据库会话 使用关键字参数传入字段数据 db.Model基类会提供构造函数赋值对应的类属性。
+# 3. 提交数据库会话
+# >>> from app import User, Book  # 导入模型类
 # >>> user = User(name='Emroy')  # 创建一个 User 记录
 # >>> m1 = Book(title='Leon', year='1994')  # 创建一个 Book记录
 # >>> m2 = Book(title='Mahjong', year='1996')  # 再创建一个 Book记录
@@ -175,7 +187,7 @@ def initdb(drop):
 # 常用的查询方法：
 
 # 查询方法	说明
-# all()	返回包含所有查询记录的列表
+# all()	    返回包含所有查询记录的列表
 # first()	返回查询的第一条记录，如果未找到，则返回 None
 # get(id)	传入主键值作为参数，返回指定主键值的记录，如果未找到，则返回 None
 # count()	返回查询结果的数量
@@ -212,7 +224,7 @@ def forge():
         db.session.add(book)
 
     db.session.commit()
-    click.echo('Done.')
+    click.echo('Done.Add fake data in database')
 
 
 @app.errorhandler(404)  # 传入要处理的错误代码
@@ -234,7 +246,67 @@ def page_not_found(e):
     return render_template('404.html'), 404
 
 
-@app.route('/')
+# # @app.route('/')
+# @app.route('/', methods=['GET', 'POST'])
+# def index():
+#     books = Book.query.all()
+#     return render_template('index.html', books=books)
+
+# 因为它在请求触发时才会包含数据，所以你只能在视图函数内部调用它
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    if request.method == 'POST':  # 判断是否是 POST 请求
+        # 获取表单数据 request.form 是一个特殊的字典，用表单字段的 name 属性值可以获取用户填入的对应数据
+        title = request.form.get('title')  # 传入表单对应输入字段的 name 值
+        year = request.form.get('year')
+        # 验证数据
+        if not title or not year or len(year) > 4 or len(title) > 60:
+            flash('Invalid input.')  # 显示错误提示
+            return redirect(url_for('index'))  # 重定向回主页
+        # 保存表单数据到数据库
+        book = Book(title=title, year=year)  # 创建记录
+        db.session.add(book)  # 添加到数据库会话
+        db.session.commit()  # 提交数据库会话
+        # 显示成功创建的提示 get_flashed_messages() 函数则用来在模板中获取提示消息
+        flash('Item created.')
+        return redirect(url_for('index'))  # 重定向回主页
+
     books = Book.query.all()
     return render_template('index.html', books=books)
+
+
+# 编辑条目
+
+@app.route('/book/edit/<int:book_id>', methods=['GET', 'POST'])
+def edit(book_id):
+    book = Book.query.get_or_404(book_id)
+    # book_id 变量是书条目记录在数据库中的主键值，
+    # 这个值用来在视图函数里查询到对应的书记录。查询的时候，我们使用了 get_or_404() 方法，它会返回对应主键的记录，如果没有找到，则返回 404 错误响应。
+
+    if request.method == 'POST':  # 处理编辑表单的提交请求
+        title = request.form['title']
+        year = request.form['year']
+
+        if not title or not year or len(year) != 4 or len(title) > 60:
+            flash('Invalid input.')
+            return redirect(url_for('edit', book_id=book_id))  # 重定向回对应的编辑页面
+
+        book.title = title  # 更新标题
+        book.year = year  # 更新年份
+        db.session.commit()  # 提交数据库会话
+        flash('Item updated.')
+        return redirect(url_for('index'))  # 重定向回主页
+
+    return render_template('edit.html', book=book)  # 传入被编辑的电影记录
+
+
+# 删除条目
+@app.route('/book/delete/<int:book_id>', methods=['POST'])  # 限定只接受 POST 请求
+def delete(book_id):  # 不涉及数据传递，创建删除视图函数
+    book = Book.query.get_or_404(book_id)  # 获取书记录
+    db.session.delete(book)  # 删除对应的记录
+    db.session.commit()  # 提交数据库会话
+    flash('Item deleted.')
+    return redirect(url_for('index'))  # 重定向回主页
+# 为安全考虑，一般使用POST请求提交删除请求，即使用表单来实现（而不是创建删除连接）
+

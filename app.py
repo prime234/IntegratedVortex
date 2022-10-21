@@ -125,6 +125,56 @@ class Book(db.Model):  # 表名book
     title = db.Column(db.String(60))  # 书名
     year = db.Column(db.String(4))  # 年份
 
+# hrserver 数据test
+
+
+class DataSetModel(db.Model):
+
+    __tablename__ = 'dataset'
+    id = db.Column(db.Integer, name='id', comment='id', primary_key=True)
+    name = db.Column(db.String(100), name='name', comment='名称')
+    type = db.Column(db.Integer, name='type',
+                     comment='类型(0:文件夹, 1:sql数据集, 2:excel数据集)')
+
+
+class DataSetSql(db.Model):
+    """
+    sql数据集内容
+    """
+    __tablename__ = 'dataset_sql'
+    __table_args__ = {'sqlite_autoincrement': True}
+
+    id = db.Column(db.Integer, name='id', comment='id', primary_key=True)
+    dataset_id = db.Column(db.Integer, name='dataset_id', comment='数据集id')
+    datasource_id = db.Column(
+        db.Integer, name='datasource_id', comment='数据源id')
+    table = db.Column(db.String(100), name='table', comment='表或视图名')
+    sql = db.Column(db.Text, name='sql', comment='自定义sql语句')
+
+
+class DataSetFile(db.Model):
+    """
+    excel数据集内容
+    """
+    __tablename__ = 'dataset_excel'
+    __table_args__ = {'sqlite_autoincrement': True}
+
+    id = db.Column(db.Integer, name='id', comment='id', primary_key=True)
+    dataset_id = db.Column(db.Integer, name='dataset_id', comment='数据集id')
+    file_path = db.Column(db.String(1024), name='file_path', comment='文件路径')
+    load_mode = db.Column(db.Integer, name='load_mode',
+                          comment='加载方式, 0 - 源表, 1 - 生成逆透视表', default=0)
+    start_line = db.Column(db.Integer, name='start_line',
+                           comment='起始行', default=1)
+    header = db.Column(db.Integer, name='header',
+                       comment='表头, 0 - 自动, 1 - 第一行, 2 - 无', default=0)
+    delete_invalid = db.Column(
+        db.Boolean, name='delete_invalid', comment='删除无效行', default=False)
+    worksheet = db.Column(db.String(1024), name='worksheet')
+    code_type = db.Column(db.String(1024), name='code_type')
+    delimiter = db.Column(db.String(1024), name='delimiter')
+
+
 # 模型类编写限制：
 # 模型类的编写有一些限制：
 # 模型类要声明继承 db.Model。
@@ -227,6 +277,30 @@ def forge():
     click.echo('Done.Add fake data in database')
 
 
+@app.cli.command()
+def forge1():
+    db.create_all()
+    # 全局的两个变量移动到这个函数内
+    datasetmodels = [{'name': 'sql', 'type': '1'},
+                     {'name': 'csv', 'type': '2'}]
+    datasetsqls = [{'dataset_id': '87',
+                    'table': 'data_studio_miner/table/miner_dig'}]
+    datasetexcels = [
+        {'file_path': 'D:\study\416007000.csv', 'dataset_id': '86'}]
+    for m in datasetmodels:
+        datasetmodel = DataSetModel(name=m['name'], type=m['type'])
+        db.session.add(datasetmodel)
+    for s in datasetsqls:
+        datasetsql = DataSetSql(dataset_id=s['dataset_id'], table=s['table'])
+        db.session.add(datasetsql)
+    for e in datasetexcels:
+        datasetexcel = DataSetFile(
+            file_path=e['file_path'], dataset_id=e['dataset_id'])
+        db.session.add(datasetexcel)
+    db.session.commit()
+    click.echo('Add fake data in dataset')
+
+
 @app.errorhandler(404)  # 传入要处理的错误代码
 def page_not_found(e):  # 接受异常对象作为参数
     user = User.query.first()
@@ -309,4 +383,3 @@ def delete(book_id):  # 不涉及数据传递，创建删除视图函数
     flash('Item deleted.')
     return redirect(url_for('index'))  # 重定向回主页
 # 为安全考虑，一般使用POST请求提交删除请求，即使用表单来实现（而不是创建删除连接）
-

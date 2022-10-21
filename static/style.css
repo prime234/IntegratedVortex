@@ -1,7 +1,7 @@
 /* 页面整体 */
 body {
     margin: auto;
-    max-width: 580px;
+    max-width: 1300px;
     font-size: 14px;
     font-family: Helvetica, Arial, sans-serif;
 }
@@ -19,7 +19,7 @@ footer {
     width: 40px;
 }
 
-/* 电影列表 */
+/* 书籍列表 */
 .book-list {
     list-style-type: none;
     padding: 0;

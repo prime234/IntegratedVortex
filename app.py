@@ -1,4 +1,5 @@
 # 程序主页
+from flask_login import LoginManager
 import click
 from flask import Flask, render_template
 from markupsafe import escape
@@ -10,10 +11,14 @@ import os
 import sys
 # from foo_orm import Model, Column, String
 
+from werkzeug.security import generate_password_hash, check_password_hash
+# 使用Flask依赖Werkzeug内置的用于生成和验证密码散列值的函数
+
 from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
 
-
+from flask_login import UserMixin
 # 从 flask 包导入 Flask 类，通过实例化这个类，创建一个程序对象 app
+from flask_login import login_required, logout_user
 
 app = Flask(__name__)
 
@@ -114,10 +119,47 @@ db = SQLAlchemy(app)  # 初始化扩展，传入程序实例app
 
 
 # 创建数据库模型 SQL炼金术
-class User(db.Model):  # 表名user(自动生成) 单个单词转小写 多个小写下划线分割
+# 存储用户信息的User模型类，为新增用户认证，添加username字段：存储登录所需用户名；password_hash字段：密码散列值
+class User(db.Model, UserMixin):  # 表名user(自动生成) 单个单词转小写 多个小写下划线分割
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))   # 名字
 # 表的字段（列）由db.Column类的实例表示，字段的类型通过Column类的构造方法的第一个参数传入
+    username = db.Column(db.String(20))  # 用户名
+    password_hash = db.Column(db.String(128))  # 密码散列值
+
+    def set_password(self, password):  # 用来设置密码的方法，接收密码作为参数
+        self.password_hash = generate_password_hash(password)  # 将生成的密码保存到对应字段
+
+    def validate_password(self, password):  # 用于验证密码的方法，接受密码作为参数
+        return check_password_hash(self.password_hash, password)  # 返回布尔值
+
+# 因为模型表结构发生变化，需重新生成数据库（会清空数据）：
+# flask initdb --drop
+
+
+# 编写命令创建管理员账户
+@app.cli.command()
+@click.option('--username', prompt=True, help='The username used to login.')
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='The password used to login.')
+def admin(username, password):
+    """Create user."""
+    db.create_all()
+
+    user = User.query.first()
+    if user is not None:
+        click.echo('Updating user...')
+        user.username = username
+        user.set_password(password)  # 设置密码
+    else:
+        click.echo('Creating user...')
+        user = User(username=username, name='Admin')
+        user.set_password(password)  # 设置密码
+        db.session.add(user)
+
+    db.session.commit()  # 提交数据库会话
+    click.echo('Done.')
+
+# click.option()装饰器设置的两个选项分别用来接受输入用户名和密码。执行flask命令创建
 
 
 class Book(db.Model):  # 表名book
@@ -284,9 +326,10 @@ def forge1():
     datasetmodels = [{'name': 'sql', 'type': '1'},
                      {'name': 'csv', 'type': '2'}]
     datasetsqls = [{'dataset_id': '87',
-                    'table': 'data_studio_miner/table/miner_dig'}]
+                    'table': 'data_studio_miner/table/miner_dig'}, {'dataset_id': '89',
+                                                                    'table': 'data_studio_miner/table/miner'}]
     datasetexcels = [
-        {'file_path': 'D:\study\416007000.csv', 'dataset_id': '86'}]
+        {'file_path': 'D:\study\416007000.csv', 'dataset_id': '86'}, {'file_path': 'D:\study\112.xlsx', 'dataset_id': '67'}]
     for m in datasetmodels:
         datasetmodel = DataSetModel(name=m['name'], type=m['type'])
         db.session.add(datasetmodel)
@@ -383,3 +426,53 @@ def delete(book_id):  # 不涉及数据传递，创建删除视图函数
     flash('Item deleted.')
     return redirect(url_for('index'))  # 重定向回主页
 # 为安全考虑，一般使用POST请求提交删除请求，即使用表单来实现（而不是创建删除连接）
+
+
+# 使用Flask-Login实现用户认证需要的各类功能函数，我们将使用它来实现程序的用户认证
+
+login_manager = LoginManager(app)  # 实例化扩展类
+
+
+@login_manager.user_loader
+def load_user(user_id):  # 创建用户加载回调函数，接受用户I的作为参数
+    user = User.query.get(int(user_id))  # 用ID作为User模型类的主键查询对应的用户
+    return user  # 返回用户对象
+# Flask-Login 提供了一个 current_user 变量，注册这个函数的目的是，当程序运行后，如果用户已登录， current_user 变量的值会是当前用户的用户模型类记录。
+
+# 另一个步骤是让存储用户的 User 模型类继承 Flask-Login 提供的 UserMixin 类：
+# 继承之后会让User类拥有几个用于判断认证状态的属性和方法，其中最常用的是 is_authenticated 属性：如果当前用户已经登录，那么 current_user.is_authenticated 会返回 True， 否则返回 False。
+# 有了 current_user 变量和这几个验证方法和属性，我们可以很轻松的判断当前用户的认证状态。
+
+# 用于显示登录页面和处理登录表单提交请求的视图函数：
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if not username or not password:
+            flash('Invalid input.')
+            return redirect(url_for('login'))
+
+        user = User.query.first()
+        # 验证用户名和密码是否一致
+        if username == user.username and user.validate_password(password):
+            login_user(user)  # 登入用户
+            flash('Login success.')
+            return redirect(url_for('index'))  # 重定向导主页
+
+        flash('Invalid username or password')  # 如果验证失败，显示错误消息
+        return redirect(url_for('login'))  # 重定向回登录页面
+
+    return render_template('login.html')
+
+
+# 登出
+@app.route('/logout')
+@login_required  # 用于视图保护
+def logout():
+    logout_user()  # 登出用户
+    flash('Goodbye.')
+    return redirect(url_for('index'))  # 重定向回首页

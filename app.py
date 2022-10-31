@@ -1,4 +1,5 @@
 # 程序主页
+# from crypt import methods
 from flask_login import LoginManager
 import click
 from flask import Flask, render_template
@@ -18,8 +19,7 @@ from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
 
 from flask_login import UserMixin
 # 从 flask 包导入 Flask 类，通过实例化这个类，创建一个程序对象 app
-from flask_login import login_required, logout_user
-
+from flask_login import login_required, logout_user, current_user
 app = Flask(__name__)
 
 # 使用 app.route() 装饰器来为这个函数绑定对应的 URL，当用户在浏览器访问这个 URL 的时候，
@@ -373,6 +373,10 @@ def page_not_found(e):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':  # 判断是否是 POST 请求
+        # 创建新条目的操作有些不同，应为对应的视图同时处理显示页面的get请求和创建新条目的post请求，仅需要禁止未登录用户创建新条目，
+        # 因此不适用login_required, 而是在函数内部的post请求处理代码前进行过滤。
+        if not current_user.is_authenticated:  # 如果当前用户未认证
+            return redirect(url_for('index'))  # 重定向到主页
         # 获取表单数据 request.form 是一个特殊的字典，用表单字段的 name 属性值可以获取用户填入的对应数据
         title = request.form.get('title')  # 传入表单对应输入字段的 name 值
         year = request.form.get('year')
@@ -395,6 +399,7 @@ def index():
 # 编辑条目
 
 @app.route('/book/edit/<int:book_id>', methods=['GET', 'POST'])
+@login_required   # 视图保护层面附加装饰器，不允许未登录用户访问  页面上有些内容需要对未登录用户隐藏 ，即认证保护。
 def edit(book_id):
     book = Book.query.get_or_404(book_id)
     # book_id 变量是书条目记录在数据库中的主键值，
@@ -419,6 +424,7 @@ def edit(book_id):
 
 # 删除条目
 @app.route('/book/delete/<int:book_id>', methods=['POST'])  # 限定只接受 POST 请求
+@login_required  # 登录保护
 def delete(book_id):  # 不涉及数据传递，创建删除视图函数
     book = Book.query.get_or_404(book_id)  # 获取书记录
     db.session.delete(book)  # 删除对应的记录
@@ -431,6 +437,7 @@ def delete(book_id):  # 不涉及数据传递，创建删除视图函数
 # 使用Flask-Login实现用户认证需要的各类功能函数，我们将使用它来实现程序的用户认证
 
 login_manager = LoginManager(app)  # 实例化扩展类
+login_manager.login_view = 'login'
 
 
 @login_manager.user_loader
@@ -476,3 +483,26 @@ def logout():
     logout_user()  # 登出用户
     flash('Goodbye.')
     return redirect(url_for('index'))  # 重定向回首页
+
+
+# 添加涉资页面，支持修改用户名字
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    if request.method == 'POST':
+        name = request.form['name']
+
+        if not name or len(name) > 20:
+            flash('Invalid input.')
+            return redirect(url_for('settings'))
+
+        current_user.name = name
+        # current_user 会返回当前登录用户的数据库记录对象
+        # 等同于下面的用法
+        # user = User.query.first()
+        # user.name = name
+        db.session.commit()
+        flash('Settings updated.')
+        return redirect(url_for('index'))
+
+    return render_template('settings.html')

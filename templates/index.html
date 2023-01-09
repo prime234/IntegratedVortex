@@ -1,13 +1,15 @@
 {% extends 'base.html' %}
-
 {% block content %}
 
 <p></p>
+<!--认证保护的另一形式是页面模板内容的保护-->
+{% if current_user.is_authenticated %}
 <form method="post">
     Name <input type="text" name="title" autocomplete="off" required>
     Year <input type="text" name="year" autocomplete="off" required>
     <input class="btn" type="submit" name="submit" value="Add">
 </form>
+{% endif %}
 {# autocomplete 属性设为 off 来关闭自动完成（按下输入框不显示历史输入记录）；另外还添加了 required 标志属性，如果用户没有输入内容就按下了提交按钮，浏览器会显示错误提示。#}
 <p>{{ books|length }} Titles</p>
 
@@ -15,6 +17,7 @@
     {% for book in books %}
     <li>{{ book.title }} - {{ book.year }}
         <span class="float-right">
+        {% if current_user.is_authenticated %}
             <a class="btn" href="{{ url_for('edit', book_id=book.id) }}">Edit</a>
             <form class="inline-form" method="post" action="{{ url_for('delete', book_id=book.id) }}">
                 <input class="btn" type="submit" name="delete" value="Delete" onclick="return confirm('Are you sure?')">
@@ -22,7 +25,7 @@
             <a class="imdb" href="https://www.imdb.com/find?q={{ book.title }}" target="_blank" title="Find this book on IMDb">IMDb</a>
         
             ...
-        
+        {% endif %}
         </span>
     </li>
     {% endfor %}

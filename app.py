@@ -1,6 +1,7 @@
 # 程序主页
 # from crypt import methods
 from flask_login import LoginManager
+from flask_login import login_user
 import click
 from flask import Flask, render_template
 from markupsafe import escape
@@ -217,6 +218,13 @@ class DataSetFile(db.Model):
     delimiter = db.Column(db.String(1024), name='delimiter')
 
 
+class DataSourceModel(db.Model):
+    __tablename__ = 'datasource'
+    id = db.Column(db.Integer, name='id', comment='id', primary_key=True)
+    name = db.Column(db.String(100), name='name', comment='名称')
+    type = db.Column(db.Integer, name='type', comment='类型(0:文件夹, 1:连接)')
+    content = db.Column(db.Text, name='content', comment='数据源内容')
+
 # 模型类编写限制：
 # 模型类的编写有一些限制：
 # 模型类要声明继承 db.Model。
@@ -325,11 +333,11 @@ def forge1():
     # 全局的两个变量移动到这个函数内
     datasetmodels = [{'name': 'sql', 'type': '1'},
                      {'name': 'csv', 'type': '2'}]
-    datasetsqls = [{'dataset_id': '87',
-                    'table': 'data_studio_miner/table/miner_dig'}, {'dataset_id': '89',
-                                                                    'table': 'data_studio_miner/table/miner'}]
+    datasetsqls = [{'dataset_id': '1',
+                    'table': 'data_studio_miner/table/iris'}, {'dataset_id': '2',
+                                                               'table': 'data_studio_miner/table/miner_dig'}]
     datasetexcels = [
-        {'file_path': 'D:\study\416007000.csv', 'dataset_id': '86'}, {'file_path': 'D:\study\112.xlsx', 'dataset_id': '67'}]
+        {'file_path': 'D:\study\iris.csv', 'dataset_id': '3'}, {'file_path': 'D:\study\iris.xlsx', 'dataset_id': '4'}]
     for m in datasetmodels:
         datasetmodel = DataSetModel(name=m['name'], type=m['type'])
         db.session.add(datasetmodel)

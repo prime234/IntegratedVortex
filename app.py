@@ -7,7 +7,8 @@ from flask import Flask, render_template
 from markupsafe import escape
 from flask import Flask
 from flask import url_for
-from flask import request, url_for, redirect, flash
+from flask import request, url_for, redirect, flash, Blueprint
+
 # Flask 会在请求触发后把请求信息放到 request 对象里，你可以从 flask 包导入它：
 import os
 import sys
@@ -22,6 +23,18 @@ from flask_login import UserMixin
 # 从 flask 包导入 Flask 类，通过实例化这个类，创建一个程序对象 app
 from flask_login import login_required, logout_user, current_user
 app = Flask(__name__)
+# app.config['UPLOAD_FOLDER'] = os.getcwd()
+# app.config['MAX_CONTENT_LENGTH'] = 16* 1024 * 1024
+
+
+def create_app():
+    app.register_blueprint(bp, url_prefix='/file_upload')
+    return app
+
+
+if __name__ == '__main__':
+    app = create_app()
+    app.run('0.0.0.0', 1234)
 
 # 使用 app.route() 装饰器来为这个函数绑定对应的 URL，当用户在浏览器访问这个 URL 的时候，
 # 就会触发这个函数，获取返回值，并把返回值显示到浏览器窗口：
